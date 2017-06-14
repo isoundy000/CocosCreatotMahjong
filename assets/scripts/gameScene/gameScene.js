@@ -18,6 +18,7 @@ cc.Class({
 
     sendCards : function (shuffle) {
         cc.log("=== 发·牌 ===");
+        var userMahjong = new Array();
         
 
         
