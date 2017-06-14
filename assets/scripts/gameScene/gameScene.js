@@ -9,7 +9,6 @@ cc.Class({
 
     onLoad: function () {
         cc.log("======== 麻将游戏·上 ========");
-        this.sendCards();
         var shuffle = this.mahjongShuffle(this.cardsArrayInit());
         this.sendCards(shuffle);
 
@@ -18,10 +17,22 @@ cc.Class({
 
     sendCards : function (shuffle) {
         cc.log("=== 发·牌 ===");
-        var userMahjong = new Array();
-        
+        var player = {};
+        for(let i=0; i<4; i++){
+            player["robot"+i] = {};
+            player["robot"+i].mahjong = new Array();
+        }
+        for(let i=0; i<52; i++){
+            if(i<13) player.robot0.mahjong[i] = shuffle[i];
+            else if(i>=13 && i<26) player.robot1.mahjong[i] = shuffle[i];
+            else if(i>=26 && i<39) player.robot2.mahjong[i] = shuffle[i];
+            else if(i>=39) player.robot3.mahjong[i] = shuffle[i];
+            shuffle = this.reduceGetNewArray(shuffle, i);
+        }
+        for(let i=0; i<4; i++) player["robot"+i].mahjong.sort();
 
-        
+        cc.log(player);
+        cc.log(shuffle);
     },
 
 
@@ -34,7 +45,6 @@ cc.Class({
             shuffle[i] = mahjong[random];
             mahjong = this.reduceGetNewArray(mahjong, random);
         }
-        cc.log(shuffle);
         return shuffle;
     },
     // 随机取出一张牌后 原来的数组中减去被取出的那张牌
