@@ -14,10 +14,10 @@ cc.Class({
     },
 
     onLoad: function () {
+        this.clickCardBtn = false;
         var shuffle = this.mahjongShuffle(this.cardsArrayInit());
         this.sendCards(shuffle);
         this.mahjongShow();
-        this.chooseNoNeed();
     },
 
     // 发牌算法
@@ -49,64 +49,84 @@ cc.Class({
         }
         cc.loader.loadRes("images/mahjong/pai", cc.SpriteAtlas, function(err, atlas){
             if (err) { log (err); return; }
-            var img;
             for(let i=0; i<4; i++){
                 var mahjongNode = self["mahjongNode"+(i+1)];
                 for(let j=0; j<13; j++){
                     var count = self.player["robot"+i].mahjong[j]
-                    var cardNum = count.toString().substr(count.toString().length-2, 1);
-                    if(count<200)
-                        img = "nan_tong_" + cardNum;
-                    else if (count>200 && count<300)
-                        img = "nan_tiao_" + cardNum;
-                    else
-                        img = "nan_wan_" + cardNum;
-                    var frame = atlas.getSpriteFrame(img);
+                    var frame = atlas.getSpriteFrame(self.getImgByCardId(count));
                     var mahjong = mahjongNode.getChildByName("mahjong"+(j+1));
                     var pai = mahjong.getChildByName("card");
                     pai.getComponent(cc.Sprite).spriteFrame = frame;
                 }
             }
         });
+        var banker = utils.intRandom(0, 3); //随机选择一位庄家
+        this.getNewCard(banker, 13);
     },
     // 根据牌的id选择牌
     getCardById : function (cardId, num, nodeId) {
         var self = this;
         var mahjongNode = this["mahjongNode"+(nodeId+1)];
+        this.mahjongSetPositon(mahjongNode, num);
         var mahjong = mahjongNode.getChildByName("mahjong"+num);
         mahjong.active = true;
-        c.loader.loadRes("images/mahjong/pai", cc.SpriteAtlas, function(err, atlas){
+        cc.loader.loadRes("images/mahjong/pai", cc.SpriteAtlas, function(err, atlas){
             if (err) { log (err); return; }
-            var img;
-            var cardNum = cardId.toString().substr(count.toString().length-2, 1);
-            if(count<200)
-                img = "nan_tong_" + cardNum;
-            else if (count>200 && count<300)
-                img = "nan_tiao_" + cardNum;
-            else
-                img = "nan_wan_" + cardNum;
-            var frame = atlas.getSpriteFrame(img);
+            var frame = atlas.getSpriteFrame(self.getImgByCardId(cardId));
             var pai = mahjong.getChildByName("card");
             pai.getComponent(cc.Sprite).spriteFrame = frame;
         });
     },
+    // 根据 cardId 获取 img 名称
+    getImgByCardId : function (cardId) {
+        var img;
+        var cardNum = cardId.toString().substr(cardId.toString().length-2, 1);
+        if(cardId<200)
+            img = "nan_tong_" + cardNum;
+        else if(cardId>200 && cardId<300)
+            img = "nan_tiao_" + cardNum;
+        else
+            img = "nan_wan_" + cardNum;
+        return img;
+    },
 
-    // 选缺 和 庄家
-    chooseNoNeed : function () {
-        var banker = utils.intRandom(0, 3);
-        this.player["robot"+banker].mahjong[13] = this.restCards[1];
-        this.getCardById(this.restCards[1], 14, banker);
+    // 摸排
+    getNewCard : function (player, lastCards) {
+        this.player["robot"+player].mahjong[lastCards] = this.restCards[1];
+        this.getCardById(this.restCards[1], lastCards+1, player);
         this.restCards = this.reduceGetNewArray(this.restCards, 1);
-        var cardNumber = this.centerBox.getChildByName("number")
+        var cardNumber = this.centerBox.getChildByName("number");
         cardNumber.getComponent(cc.Label).string = this.restCards.length;
-        this.setArrowShow(banker);
+        this.setArrowShow(player);
+        if(lastCards === 13) {
+            let mjArray = this.player["robot"+player].mahjong;
+            this.cardSetSort(mjArray, player);
+        }
     },
     // 设置该谁出牌的箭头显示
-    setArrowShow : function (banker) {
+    setArrowShow : function (player) {
         for(let i=1; i<4; i++)
             this.centerBox.getChildByName("arrow"+i).active = false;
-        this.centerBox.getChildByName("arrow"+(banker+1)).active = true;
+        this.centerBox.getChildByName("arrow"+(player+1)).active = true;
     },
+    // 牌 排序 显示
+    cardSetSort : function (cardArray, nodeId) {
+        var self = this;
+        cardArray.sort();
+        var mahjongNode = this["mahjongNode"+(nodeId+1)];
+        for(let i=1; i<15; i++) 
+            mahjongNode.getChildByName("mahjong"+i).active = false;
+        cc.loader.loadRes("images/mahjong/pai", cc.SpriteAtlas, function(err, atlas){
+            if (err) { log (err); return; }
+            for(let i=0; i<cardArray.length; i++){
+                var frame = atlas.getSpriteFrame(self.getImgByCardId(cardArray[i]));
+                var mahjong = mahjongNode.getChildByName("mahjong"+(i+1));
+                mahjong.active = true;
+                var pai = mahjong.getChildByName("card");
+                pai.getComponent(cc.Sprite).spriteFrame = frame;
+            }
+        });
+    }, 
 
     // 根据牌的数量调整牌的位置
     mahjongSetPositon : function (mahjongNode, num) {
@@ -159,7 +179,27 @@ cc.Class({
     },
 
     downCardBtnClick : function (event, customEventData) {
-        cc.log("=== customEventData: ", customEventData);
+        var mahjong = this.mahjongNode1.getChildByName("mahjong"+customEventData);
+        var py = mahjong.getPositionY();
+        cc.log("py1 = ", py);
+        var length = this.player.robot0.mahjong.length;
+        for(let i=1; i<=length; i++) {
+            var all = this.mahjongNode1.getChildByName("mahjong"+i);
+            all.setPosition(cc.p(all.getPositionX(), 0));
+        }
+        if(this.clickCardBtn === false) {
+            mahjong.setPosition(cc.p(mahjong.getPositionX(), mahjong.getPositionY()+10));            
+            this.clickCardBtn = true;
+        } else {
+            cc.log("py2 = ", py);
+            if(py === 0){
+                mahjong.setPosition(cc.p(mahjong.getPositionX(), mahjong.getPositionY()+10));            
+                this.clickCardBtn = true;
+            } else {
+                mahjong.setPosition(cc.p(mahjong.getPositionX(), 0));
+                this.clickCardBtn = false;
+            }
+        }
     },
 
     menuBtnClick : function () {
