@@ -22,6 +22,7 @@ cc.Class({
 
     mainInit: function () {
     	var userinfo = db.get("UserInfo");
+        if(!userinfo) return;
     	this.roomCardNum.string = userinfo.roomCard;
     	this.nickname.string = userinfo.nickname;
     	this.nickname.string = userinfo.id;

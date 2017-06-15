@@ -8,12 +8,16 @@ cc.Class({
         mahjongNode2: cc.Node,
         mahjongNode3: cc.Node,
         mahjongNode4: cc.Node,
+        menuBtn: cc.Node,
+        menuBack: cc.Node,
+        centerBox: cc.Node,
     },
 
     onLoad: function () {
         var shuffle = this.mahjongShuffle(this.cardsArrayInit());
         this.sendCards(shuffle);
         this.mahjongShow();
+        this.chooseNoNeed();
     },
 
     // 发牌算法
@@ -31,7 +35,6 @@ cc.Class({
             shuffle = this.reduceGetNewArray(shuffle, i);
         }
         for(let i=0; i<4; i++) player["robot"+i].mahjong.sort();
-
         this.player = player;
         this.restCards = shuffle;
     },
@@ -66,10 +69,43 @@ cc.Class({
             }
         });
     },
+    // 根据牌的id选择牌
+    getCardById : function (cardId, num, nodeId) {
+        var self = this;
+        var mahjongNode = this["mahjongNode"+(nodeId+1)];
+        var mahjong = mahjongNode.getChildByName("mahjong"+num);
+        mahjong.active = true;
+        c.loader.loadRes("images/mahjong/pai", cc.SpriteAtlas, function(err, atlas){
+            if (err) { log (err); return; }
+            var img;
+            var cardNum = cardId.toString().substr(count.toString().length-2, 1);
+            if(count<200)
+                img = "nan_tong_" + cardNum;
+            else if (count>200 && count<300)
+                img = "nan_tiao_" + cardNum;
+            else
+                img = "nan_wan_" + cardNum;
+            var frame = atlas.getSpriteFrame(img);
+            var pai = mahjong.getChildByName("card");
+            pai.getComponent(cc.Sprite).spriteFrame = frame;
+        });
+    },
 
-    // 选缺
+    // 选缺 和 庄家
     chooseNoNeed : function () {
-        
+        var banker = utils.intRandom(0, 3);
+        this.player["robot"+banker].mahjong[13] = this.restCards[1];
+        this.getCardById(this.restCards[1], 14, banker);
+        this.restCards = this.reduceGetNewArray(this.restCards, 1);
+        var cardNumber = this.centerBox.getChildByName("number")
+        cardNumber.getComponent(cc.Label).string = this.restCards.length;
+        this.setArrowShow(banker);
+    },
+    // 设置该谁出牌的箭头显示
+    setArrowShow : function (banker) {
+        for(let i=1; i<4; i++)
+            this.centerBox.getChildByName("arrow"+i).active = false;
+        this.centerBox.getChildByName("arrow"+(banker+1)).active = true;
     },
 
     // 根据牌的数量调整牌的位置
@@ -124,6 +160,31 @@ cc.Class({
 
     downCardBtnClick : function (event, customEventData) {
         cc.log("=== customEventData: ", customEventData);
+    },
+
+    menuBtnClick : function () {
+        this.scheduleOnce(function(){
+            if(!this.menuBack.active) {
+                this.isMenuOpen = true;
+                this.menuBack.active = true;
+            } else {
+                this.isMenuOpen = false;
+                this.menuBack.active = false;
+            }
+        }, 0.1);
+        
+    },
+    setBtnClick : function () {
+
+    },
+    skinBtnClick : function () {
+
+    },
+    helpBtnClick : function () {
+
+    },
+    exitBtnClick : function () {
+        cc.director.loadScene('MainScene');
     },
 });
 
