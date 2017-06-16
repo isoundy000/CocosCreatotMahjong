@@ -179,9 +179,12 @@ cc.Class({
     },
 
     downCardBtnClick : function (event, customEventData) {
+        this.time = new Array();
+        this.time[this.time.length] = (new Data()).getTime();
+        cc.log(this.time);
+
         var mahjong = this.mahjongNode1.getChildByName("mahjong"+customEventData);
         var py = mahjong.getPositionY();
-        cc.log("py1 = ", py);
         var length = this.player.robot0.mahjong.length;
         for(let i=1; i<=length; i++) {
             var all = this.mahjongNode1.getChildByName("mahjong"+i);
@@ -191,15 +194,22 @@ cc.Class({
             mahjong.setPosition(cc.p(mahjong.getPositionX(), mahjong.getPositionY()+10));            
             this.clickCardBtn = true;
         } else {
-            cc.log("py2 = ", py);
             if(py === 0){
                 mahjong.setPosition(cc.p(mahjong.getPositionX(), mahjong.getPositionY()+10));            
                 this.clickCardBtn = true;
             } else {
-                mahjong.setPosition(cc.p(mahjong.getPositionX(), 0));
-                this.clickCardBtn = false;
+                // mahjong.setPosition(cc.p(mahjong.getPositionX(), 0));
+                // this.clickCardBtn = false;
+                //出牌
+                this.discardFunc(1, this.player.robot0.mahjong[customEventData-1]);
             }
         }
+    },
+    // 出牌
+    discardFunc : function (mahjongNodeId, cardId) {
+        var mahjongNode = this["mahjongNode" + mahjongNodeId];
+        cc.log("cardId = ", cardId);
+
     },
 
     menuBtnClick : function () {
