@@ -1,4 +1,5 @@
 var utils = require("utils");
+var eventCenter = require("eventCenter");
 
 cc.Class({
     extends: cc.Component,
@@ -11,6 +12,8 @@ cc.Class({
         menuBtn: cc.Node,
         menuBack: cc.Node,
         centerBox: cc.Node,
+        discardNode: cc.Node,
+        chooseMissing: cc.Node,
     },
 
     onLoad: function () {
@@ -18,6 +21,58 @@ cc.Class({
         var shuffle = this.mahjongShuffle(this.cardsArrayInit());
         this.sendCards(shuffle);
         this.mahjongShow();
+        this.thisVariableInit();
+        this.registerEventCenter();
+    },
+    thisVariableInit : function () {
+        this.time = new Array();
+        var timer = (new Date()).getTime();
+        this.time[this.time.length] = timer;
+        this.discardArray = new Array();
+        for(let i=0; i<4; i++) 
+            this.discardArray[i] = new Array();
+        this.couldAnyDiscard;
+    },
+
+    registerEventCenter: function() {
+        var self = this;
+        eventCenter.new("gameSceneDiscardListener", "discardListener",  function(event, data) {
+            cc.log("=== discardListener:", data);
+            self.setArrowShow(data);
+            if(data != 0)
+                self.discardFunc(data+1, self.judgeRobotDiscard(data));
+        }, 1);
+    },
+    unRegisterEventCenter : function() {
+        eventCenter.delete("gameSceneDiscardListener");
+    },
+    onDestroy : function() {
+        this.unRegisterEventCenter();
+    },
+    update: function (dt) {
+
+    },
+
+    // 判断机器人出哪张牌 先打缺
+    judgeRobotDiscard : function (robot) {
+        var missCard = this.chooseMissArray[robot];
+        if (missCard === "tong")
+            missCard = 0;
+        else if (missCard === "tiao")
+            missCard = 1;
+        else
+            missCard = 2;
+        cc.log("=== missCard:", missCard);
+        var mahjong = this.player["robot"+robot].mahjong;
+        cc.log(mahjong);
+        for(let i=0; i<mahjong.length; i++){
+            var cardId = mahjong[i].toString().substr(mahjong[i].toString().length-3, 1);
+            cc.log("=== cardId:", cardId);
+            cc.log("=== i+1:", i+1);
+            if (cardId == missCard)
+                return i+1;
+        }
+        return 1;
     },
 
     // 发牌算法
@@ -61,7 +116,9 @@ cc.Class({
             }
         });
         var banker = utils.intRandom(0, 3); //随机选择一位庄家
+        this.whichDiscard = banker;
         this.getNewCard(banker, 13);
+        this.chooseMissingFunc();
     },
     // 根据牌的id选择牌
     getCardById : function (cardId, num, nodeId) {
@@ -90,6 +147,83 @@ cc.Class({
         return img;
     },
 
+    // 选缺
+    chooseMissingFunc : function () {
+        this.chooseMissArray = new Array();
+        //机器人选缺
+        var leastCard = this.findLeastCards();
+        for(let i=1; i<4; i++)
+            this.missCardShow(i+1, leastCard[i]);
+        //玩家选缺
+        var chooseMiss = this.chooseMissing.getChildByName("chooseMiss");
+        chooseMiss.active = true;
+        var timer = 10;
+        this.chooseMissCallback = function(){
+            timer--;
+            if(timer>=0)
+                chooseMiss.getChildByName("timer").getComponent(cc.Label).string = timer;
+            else {
+                chooseMiss.active = false;
+                this.unschedule(this.chooseMissCallback);
+                this.missCardShow(1, leastCard[0]);
+                this.couldAnyDiscard = true;
+            }
+        }
+        this.schedule(this.chooseMissCallback, 1);
+    },
+    //选缺结束 图片显示四家缺门
+    missCardShow : function (missID, kind) {
+        var missing = this.chooseMissing.getChildByName("miss"+missID);
+        missing.active = true;
+        cc.loader.loadRes("images/mahjong/dapai", cc.SpriteAtlas, function(err, atlas){
+            if (err) { log (err); return; }
+                var frame = atlas.getSpriteFrame(kind);
+                missing.getComponent(cc.Sprite).spriteFrame = frame;
+        });
+    },
+    //选出牌中 最少的一门
+    findLeastCards : function () {
+        var leastCards = new Array();
+        for(let i=0; i<4; i++){
+            var mahjong = this.player["robot"+i].mahjong;
+            var a=0, b=0, c=0;
+            for(let j=0; j<mahjong.length; j++){
+                var kind = mahjong[j].toString().substr(mahjong[j].toString().length-3, 1);
+                if (kind == 1)
+                    a++;
+                else if (kind == 2)
+                    b++;
+                else
+                    c++;
+            }
+            var minAB = a-b>0 ? b : a;
+            var min = minAB-c>0 ? c : minAB;
+            if(a === min)
+                leastCards[i] = "tong";
+            else if(b === min)
+                leastCards[i] = "tiao";
+            else
+                leastCards[i] = "wan";
+            this.chooseMissArray[i] = leastCards[i];
+        }
+        cc.log(leastCards);
+        return leastCards;
+    },
+    //玩家选缺
+    chooseMissBtnClick : function(event, customEventData) {
+        if(customEventData === 1)
+            this.chooseMissArray[0] = "tong";
+        else if(customEventData === 2)
+            this.chooseMissArray[0] = "tiao";
+        else
+            this.chooseMissArray[0] = "wan";
+        this.chooseMissing.getChildByName("chooseMiss").active = false;
+        this.missCardShow(1, this.chooseMissArray[0]);
+        this.unschedule(this.chooseMissCallback);
+        this.couldAnyDiscard = true;
+        eventCenter.dispatch("discardListener", this.whichDiscard);
+    },
+
     // 摸排
     getNewCard : function (player, lastCards) {
         this.player["robot"+player].mahjong[lastCards] = this.restCards[1];
@@ -114,7 +248,7 @@ cc.Class({
         var self = this;
         cardArray.sort();
         var mahjongNode = this["mahjongNode"+(nodeId+1)];
-        for(let i=1; i<15; i++) 
+        for(let i=1; i<=14; i++)
             mahjongNode.getChildByName("mahjong"+i).active = false;
         cc.loader.loadRes("images/mahjong/pai", cc.SpriteAtlas, function(err, atlas){
             if (err) { log (err); return; }
@@ -126,7 +260,7 @@ cc.Class({
                 pai.getComponent(cc.Sprite).spriteFrame = frame;
             }
         });
-    }, 
+    },
 
     // 根据牌的数量调整牌的位置
     mahjongSetPositon : function (mahjongNode, num) {
@@ -178,38 +312,98 @@ cc.Class({
         return cardSortSingle;
     },
 
+    // 选择牌
     downCardBtnClick : function (event, customEventData) {
-        this.time = new Array();
-        this.time[this.time.length] = (new Data()).getTime();
-        cc.log(this.time);
-
-        var mahjong = this.mahjongNode1.getChildByName("mahjong"+customEventData);
-        var py = mahjong.getPositionY();
-        var length = this.player.robot0.mahjong.length;
-        for(let i=1; i<=length; i++) {
-            var all = this.mahjongNode1.getChildByName("mahjong"+i);
-            all.setPosition(cc.p(all.getPositionX(), 0));
-        }
-        if(this.clickCardBtn === false) {
-            mahjong.setPosition(cc.p(mahjong.getPositionX(), mahjong.getPositionY()+10));            
-            this.clickCardBtn = true;
-        } else {
-            if(py === 0){
-                mahjong.setPosition(cc.p(mahjong.getPositionX(), mahjong.getPositionY()+10));            
-                this.clickCardBtn = true;
-            } else {
-                // mahjong.setPosition(cc.p(mahjong.getPositionX(), 0));
-                // this.clickCardBtn = false;
-                //出牌
-                this.discardFunc(1, this.player.robot0.mahjong[customEventData-1]);
+        if (this.whichDiscard === 0) {
+            var isDoubleClick = this.isDoubleClick();
+            var mahjong = this.mahjongNode1.getChildByName("mahjong"+customEventData);
+            var py = mahjong.getPositionY();
+            var length = this.player.robot0.mahjong.length;
+            if(isDoubleClick)
+                this.discardFunc(1, customEventData);//出牌
+            else {
+                for(let i=1; i<=length; i++) {
+                    var all = this.mahjongNode1.getChildByName("mahjong"+i);
+                    all.setPosition(cc.p(all.getPositionX(), 0));
+                }
+                if(this.clickCardBtn === false) {
+                    mahjong.setPosition(cc.p(mahjong.getPositionX(), mahjong.getPositionY()+10));            
+                    this.clickCardBtn = true;
+                } else {
+                    if(py === 0){
+                        mahjong.setPosition(cc.p(mahjong.getPositionX(), mahjong.getPositionY()+10));            
+                        this.clickCardBtn = true;
+                    } else {
+                        mahjong.setPosition(cc.p(mahjong.getPositionX(), 0));
+                        this.clickCardBtn = false;
+                    }
+                }
             }
+        } else {
+            cc.log("=== 未到你出牌的时间 ===");
         }
     },
     // 出牌
-    discardFunc : function (mahjongNodeId, cardId) {
+    discardFunc : function (mahjongNodeId, customEventData) {
+        var robotArray = this.player["robot" + [mahjongNodeId-1]];
+        var cardId = robotArray.mahjong[customEventData-1];
         var mahjongNode = this["mahjongNode" + mahjongNodeId];
-        cc.log("cardId = ", cardId);
-
+        var mahjong = mahjongNode.getChildByName("mahjong"+customEventData);
+        var newMahjong = cc.instantiate(mahjong);
+        robotArray.mahjong.splice(customEventData-1, 1);
+        var discardArrayI = this.discardArray[mahjongNodeId-1];
+        discardArrayI[discardArrayI.length] = cardId;
+        var discardNode = this.discardNode.getChildByName("discardNode"+mahjongNodeId);
+        discardNode.addChild(newMahjong);
+        if(mahjongNodeId === 1) {
+            mahjong.setPosition(mahjong.getPositionX(), mahjong.getPositionY()-10);
+            this.cardSetSort(robotArray.mahjong, 0);
+            if(discardArrayI.length<12)
+                newMahjong.setPosition(40*(discardArrayI.length+1), 0);
+            else
+                newMahjong.setPosition(40*(discardArrayI.length-10), newMahjong.getContentSize().height-10);
+            this.whichDiscard = this.whichDiscard + 1;
+            eventCenter.dispatch("discardListener", this.whichDiscard);
+        } else if (mahjongNodeId === 2) {
+            this.cardSetSort(robotArray.mahjong, 0);
+            if(discardArrayI.length<12)
+                newMahjong.setPosition(0, 30*(discardArrayI.length+1)-20);
+            else
+                newMahjong.setPosition(newMahjong.getContentSize().width, 30*(discardArrayI.length-10)-20);
+            this.whichDiscard = this.whichDiscard + 1;
+            eventCenter.dispatch("discardListener", this.whichDiscard);
+        } else if (mahjongNodeId === 3) {
+            this.cardSetSort(robotArray.mahjong, 0);
+            if(discardArrayI.length<12)
+                newMahjong.setPosition(40*(discardArrayI.length+1), 0);
+            else
+                newMahjong.setPosition(40*(discardArrayI.length-10), newMahjong.getContentSize().height-10);
+            this.whichDiscard = this.whichDiscard + 1;
+            eventCenter.dispatch("discardListener", this.whichDiscard);
+        } else {
+            this.cardSetSort(robotArray.mahjong, 0);
+            if(discardArrayI.length<12)
+                newMahjong.setPosition(0, 30*(discardArrayI.length+1)-20);
+            else
+                newMahjong.setPosition(newMahjong.getContentSize().width, 30*(discardArrayI.length-10)-20);
+            this.whichDiscard = 0;
+            eventCenter.dispatch("discardListener", this.whichDiscard);
+        }
+        this.mahjongSetPositon(mahjongNode, robotArray.mahjong.length);
+    },
+    // 判断是否连击两下牌
+    isDoubleClick : function () {
+        var timer = (new Date()).getTime();
+        this.time[this.time.length] = timer;
+        if (this.time.length > 2) {
+            this.time[0] = this.time[1];
+            this.time[1] = this.time[2];
+            this.time.splice(2, 1);
+        }
+        if (this.time[1] - this.time[0] < 300)
+            return true
+        else
+            return false
     },
 
     menuBtnClick : function () {

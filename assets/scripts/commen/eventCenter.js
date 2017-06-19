@@ -9,7 +9,7 @@ eventCenter.new = function (name, event, cb, isLog) {
     if (!isLog) {
         cc.log("eventCenter:new", name, event, cb)
     }
-    this.events[name] = {event:event, cd:cd}
+    this.events[name] = {event:event, cb:cb}
 }
 
 eventCenter.getNums = function (){
