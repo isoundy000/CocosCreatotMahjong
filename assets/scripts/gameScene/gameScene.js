@@ -32,12 +32,12 @@ cc.Class({
         for(let i=0; i<4; i++) 
             this.discardArray[i] = new Array();
         this.couldAnyDiscard = false;
+        this.firstDiscard = true;
     },
 
     registerEventCenter: function() {
         var self = this;
         eventCenter.new("gameSceneDiscardListener", "discardListener",  function(event, data) {
-            self.getNewCard(data, self.player["robot"+data].mahjong.length-1);
             if(self.couldAnyDiscard){
                 self.setArrowShow(data);
                 if(data != 0)
@@ -230,10 +230,8 @@ cc.Class({
         var cardNumber = this.centerBox.getChildByName("number");
         cardNumber.getComponent(cc.Label).string = this.restCards.length;
         this.setArrowShow(player);
-        if(lastCards === 13) {
-            let mjArray = this.player["robot"+player].mahjong;
-            this.cardSetSort(mjArray, player);
-        }
+        let mjArray = this.player["robot"+player].mahjong;
+        this.cardSetSort(mjArray, player);
     },
     // 设置该谁出牌的箭头显示
     setArrowShow : function (player) {
@@ -312,6 +310,8 @@ cc.Class({
 
     // 选择牌
     downCardBtnClick : function (event, customEventData) {
+        cc.log("this.whichDiscard = ", this.whichDiscard);
+        cc.log("this.couldAnyDiscard = ", this.couldAnyDiscard);
         if (this.whichDiscard === 0 && this.couldAnyDiscard) {
             var isDoubleClick = this.isDoubleClick();
             var mahjong = this.mahjongNode1.getChildByName("mahjong"+customEventData);
@@ -418,6 +418,9 @@ cc.Class({
     // 点击继续游戏
     goonBtnClick : function () {
         this.couldAnyDiscard = true;
+        cc.log(this.player);
+        cc.log("=== this.whichDiscard:", this.whichDiscard);
+        this.getNewCard(this.whichDiscard, this.player["robot"+this.whichDiscard].mahjong.length);
         eventCenter.dispatch("discardListener", this.whichDiscard);
     },
 
